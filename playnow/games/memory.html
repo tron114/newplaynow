@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة الذاكرة</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px;
+            max-width: 500px;
+        }
+        .card {
+            width: 80px;
+            height: 80px;
+            background-color: #4CAF50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: transform 0.3s;
+            transform-style: preserve-3d;
+        }
+        .card.flipped {
+            transform: rotateY(180deg);
+            background-color: white;
+        }
+        .controls {
+            margin: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .score {
+            font-size: 24px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>لعبة الذاكرة</h1>
+    <div class="score">المحاولات: <span id="moves">0</span></div>
+    <div class="game-container" id="gameContainer"></div>
+    <div class="controls">
+        <button onclick="startGame()">لعبة جديدة</button>
+    </div>
+
+    <script>
+        const emojis = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'];
+        let cards = [];
+        let flippedCards = [];
+        let moves = 0;
+        let matchedPairs = 0;
+
+        function createCard(emoji) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = emoji;
+            card.dataset.emoji = emoji;
+            card.addEventListener('click', flipCard);
+            return card;
+        }
+
+        function startGame() {
+            const gameContainer = document.getElementById('gameContainer');
+            gameContainer.innerHTML = '';
+            cards = [];
+            flippedCards = [];
+            moves = 0;
+            matchedPairs = 0;
+            document.getElementById('moves').textContent = moves;
+
+            // Create pairs of cards
+            const cardEmojis = [...emojis, ...emojis];
+            // Shuffle cards
+            for (let i = cardEmojis.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cardEmojis[i], cardEmojis[j]] = [cardEmojis[j], cardEmojis[i]];
+            }
+
+            // Create and add cards to the game
+            cardEmojis.forEach(emoji => {
+                const card = createCard(emoji);
+                cards.push(card);
+                gameContainer.appendChild(card);
+            });
+        }
+
+        function flipCard() {
+            if (flippedCards.length === 2) return;
+            if (flippedCards.includes(this)) return;
+            if (this.classList.contains('matched')) return;
+
+            this.classList.add('flipped');
+            flippedCards.push(this);
+
+            if (flippedCards.length === 2) {
+                moves++;
+                document.getElementById('moves').textContent = moves;
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            const [card1, card2] = flippedCards;
+            if (card1.dataset.emoji === card2.dataset.emoji) {
+                card1.classList.add('matched');
+                card2.classList.add('matched');
+                matchedPairs++;
+                if (matchedPairs === emojis.length) {
+                    setTimeout(() => {
+                        alert('مبروك! أنهيت اللعبة في ' + moves + ' محاولة');
+                    }, 500);
+                }
+            } else {
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                }, 1000);
+            }
+            flippedCards = [];
+        }
+
+        // Start game when page loads
+        startGame();
+    </script>
+</body>
+</html>

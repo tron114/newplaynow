@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة تركيب المكعبات</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(8, 40px);
+            grid-template-rows: repeat(8, 40px);
+            gap: 1px;
+            background: #333;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 2px;
+        }
+        .filled {
+            background: #4CAF50;
+            animation: pop 0.3s ease-out;
+        }
+        @keyframes pop {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .pieces-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .piece {
+            display: grid;
+            grid-template-columns: repeat(3, 20px);
+            grid-template-rows: repeat(3, 20px);
+            gap: 1px;
+            background: #666;
+            padding: 3px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .piece:hover {
+            transform: scale(1.1);
+        }
+        .piece-cell {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 1px;
+        }
+        .piece-cell.active {
+            background: #4CAF50;
+        }
+        .stats {
+            margin: 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+        .controls {
+            margin: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>لعبة تركيب المكعبات</h1>
+    
+    <div class="stats">
+        <div>النقاط: <span id="score">0</span></div>
+        <div>أفضل نتيجة: <span id="bestScore">0</span></div>
+    </div>
+
+    <div class="game-container">
+        <div class="board" id="board"></div>
+        <div class="pieces-container" id="pieces"></div>
+    </div>
+
+    <div class="controls">
+        <button onclick="resetGame()">لعبة جديدة</button>
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <h2>انتهت اللعبة! 🎮</h2>
+        <p>النقاط: <span id="finalScore">0</span></p>
+        <button onclick="resetGame()">العب مرة أخرى</button>
+    </div>
+
+    <script>
+        const BOARD_SIZE = 8;
+        const board = document.getElementById('board');
+        const piecesContainer = document.getElementById('pieces');
+        const scoreDisplay = document.getElementById('score');
+        const bestScoreDisplay = document.getElementById('bestScore');
+        const gameOverDisplay = document.getElementById('gameOver');
+        
+        let boardState = [];
+        let score = 0;
+        let bestScore = localStorage.getItem('blockPuzzleBestScore') || 0;
+        bestScoreDisplay.textContent = bestScore;
+
+        // Piece patterns
+        const piecePatterns = [
+            [[1,1], [1,1]], // 2x2
+            [[1,1,1]], // horizontal 3
+            [[1],[1],[1]], // vertical 3
+            [[1,1,1],[0,1,0]], // T shape
+            [[1,1,0],[0,1,1]], // Z shape
+            [[0,1,1],[1,1,0]], // S shape
+            [[1,1,1,1]], // horizontal 4
+            [[1],[1],[1],[1]], // vertical 4
+            [[1,1],[1,0],[1,0]], // L shape
+            [[1,1],[0,1],[0,1]], // J shape
+        ];
+
+        function createBoard() {
+            board.innerHTML = '';
+            boardState = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+            
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                for (let j = 0; j < BOARD_SIZE; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    board.appendChild(cell);
+                }
+            }
+        }
+
+        function createPiece(pattern) {
+            const piece = document.createElement('div');
+            piece.className = 'piece';
+            piece.draggable = true;
+            
+            const rows = pattern.length;
+            const cols = pattern[0].length;
+            piece.style.gridTemplateColumns = `repeat(${cols}, 20px)`;
+            piece.style.gridTemplateRows = `repeat(${rows}, 20px)`;
+            
+            pattern.forEach(row => {
+                row.forEach(cell => {
+                    const pieceCell = document.createElement('div');
+                    pieceCell.className = cell ? 'piece-cell active' : 'piece-cell';
+                    piece.appendChild(pieceCell);
+                });
+            });
+
+            piece.addEventListener('dragstart', handleDragStart);
+            return piece;
+        }
+
+        function generatePieces() {
+            piecesContainer.innerHTML = '';
+            // Get 3 random pieces
+            for (let i = 0; i < 3; i++) {
+                const pattern = piecePatterns[Math.floor(Math.random() * piecePatterns.length)];
+                const piece = createPiece(pattern);
+                piecesContainer.appendChild(piece);
+            }
+        }
+
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', '');
+            const piece = e.target;
+            const pattern = getPiecePattern(piece);
+            piece.dataset.pattern = JSON.stringify(pattern);
+        }
+
+        function getPiecePattern(piece) {
+            const cells = piece.querySelectorAll('.piece-cell');
+            const rows = piece.style.gridTemplateRows.split(' ').length;
+            const cols = piece.style.gridTemplateColumns.split(' ').length;
+            const pattern = [];
+            
+            for (let i = 0; i < rows; i++) {
+                pattern[i] = [];
+                for (let j = 0; j < cols; j++) {
+                    pattern[i][j] = cells[i * cols + j].classList.contains('active') ? 1 : 0;
+                }
+            }
+            return pattern;
+        }
+
+        function canPlacePiece(pattern, row, col) {
+            for (let i = 0; i < pattern.length; i++) {
+                for (let j = 0; j < pattern[0].length; j++) {
+                    if (pattern[i][j]) {
+                        const newRow = row + i;
+                        const newCol = col + j;
+                        if (newRow >= BOARD_SIZE || newCol >= BOARD_SIZE || boardState[newRow][newCol]) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function placePiece(pattern, row, col) {
+            for (let i = 0; i < pattern.length; i++) {
+                for (let j = 0; j < pattern[0].length; j++) {
+                    if (pattern[i][j]) {
+                        const newRow = row + i;
+                        const newCol = col + j;
+                        boardState[newRow][newCol] = 1;
+                        const cell = board.children[newRow * BOARD_SIZE + newCol];
+                        cell.classList.add('filled');
+                    }
+                }
+            }
+            checkLines();
+        }
+
+        function checkLines() {
+            let linesCleared = 0;
+            
+            // Check rows
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                if (boardState[i].every(cell => cell === 1)) {
+                    clearRow(i);
+                    linesCleared++;
+                }
+            }
+            
+            // Check columns
+            for (let j = 0; j < BOARD_SIZE; j++) {
+                if (boardState.every(row => row[j] === 1)) {
+                    clearColumn(j);
+                    linesCleared++;
+                }
+            }
+
+            if (linesCleared > 0) {
+                score += linesCleared * 100;
+                scoreDisplay.textContent = score;
+                if (score > bestScore) {
+                    bestScore = score;
+                    localStorage.setItem('blockPuzzleBestScore', bestScore);
+                    bestScoreDisplay.textContent = bestScore;
+                }
+            }
+
+            if (!canPlaceAnyPiece()) {
+                gameOver();
+            }
+        }
+
+        function clearRow(row) {
+            boardState[row].fill(0);
+            for (let j = 0; j < BOARD_SIZE; j++) {
+                const cell = board.children[row * BOARD_SIZE + j];
+                cell.classList.remove('filled');
+            }
+        }
+
+        function clearColumn(col) {
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                boardState[i][col] = 0;
+                const cell = board.children[i * BOARD_SIZE + col];
+                cell.classList.remove('filled');
+            }
+        }
+
+        function canPlaceAnyPiece() {
+            const pieces = Array.from(piecesContainer.children);
+            for (const piece of pieces) {
+                const pattern = JSON.parse(piece.dataset.pattern);
+                for (let i = 0; i < BOARD_SIZE - pattern.length + 1; i++) {
+                    for (let j = 0; j < BOARD_SIZE - pattern[0].length + 1; j++) {
+                        if (canPlacePiece(pattern, i, j)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function gameOver() {
+            document.getElementById('finalScore').textContent = score;
+            gameOverDisplay.style.display = 'block';
+        }
+
+        function resetGame() {
+            createBoard();
+            generatePieces();
+            score = 0;
+            scoreDisplay.textContent = score;
+            gameOverDisplay.style.display = 'none';
+        }
+
+        // Initialize game
+        board.addEventListener('dragover', e => e.preventDefault());
+        board.addEventListener('drop', e => {
+            e.preventDefault();
+            const cell = e.target.closest('.cell');
+            if (!cell) return;
+
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+            const piece = document.querySelector('.piece[draggable="true"]');
+            const pattern = JSON.parse(piece.dataset.pattern);
+
+            if (canPlacePiece(pattern, row, col)) {
+                placePiece(pattern, row, col);
+                piece.remove();
+                if (piecesContainer.children.length === 0) {
+                    generatePieces();
+                }
+            }
+        });
+
+        resetGame();
+    </script>
+</body>
+</html>

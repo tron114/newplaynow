@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة البلياردو</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #2c3e50;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas {
+            background: #0a5c0a;
+            border: 20px solid #8B4513;
+            border-radius: 10px;
+            margin: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .controls {
+            margin: 10px;
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+        }
+        .power-meter {
+            width: 200px;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px auto;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+        .power-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                rgba(76, 175, 80, 0.8), 
+                rgba(255, 152, 0, 0.8), 
+                rgba(244, 67, 54, 0.8));
+            transition: width 0.1s;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+        .score {
+            font-size: 24px;
+            margin: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .settings {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            z-index: 100;
+        }
+        .settings select {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+        }
+        .training-tip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            z-index: 100;
+            font-size: 14px;
+            max-width: 200px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎱 لعبة البلياردو</h1>
+    <div class="score">النقاط: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        <div class="power-meter">
+            <div class="power-bar" id="powerBar"></div>
+        </div>
+        <button onclick="resetGame()">لعبة جديدة</button>
+    </div>
+    <div class="settings">
+        <select id="tableColor" onchange="changeTableColor()">
+            <option value="green">أخضر</option>
+            <option value="blue">أزرق</option>
+            <option value="red">أحمر</option>
+            <option value="purple">بنفسجي</option>
+        </select>
+        <select id="gameMode" onchange="changeGameMode()">
+            <option value="normal">وضع عادي</option>
+            <option value="training">وضع التدريب</option>
+        </select>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const powerBar = document.getElementById('powerBar');
+        const scoreElement = document.getElementById('score');
+
+        // Set canvas size
+        canvas.width = 800;
+        canvas.height = 400;
+
+        // Game variables
+        let balls = [];
+        let cueBall;
+        let isAiming = false;
+        let isPowerCharging = false;
+        let power = 0;
+        let score = 0;
+        const friction = 0.99;
+        const pocketRadius = 20;
+
+        // Sound effects
+        const sounds = {
+            cueHit: new Audio('sounds/cue_hit.mp3'),
+            ballCollision: new Audio('sounds/ball_collision.mp3'),
+            pocketBall: new Audio('sounds/pocket_ball.mp3'),
+            railHit: new Audio('sounds/rail_hit.mp3')
+        };
+
+        // Game settings
+        let tableColor = {
+            main: '#0a5c0a',
+            light: '#0b660b',
+            dark: '#095209'
+        };
+        
+        let isTrainingMode = false;
+        let trainingTip = document.createElement('div');
+        trainingTip.className = 'training-tip';
+        document.body.appendChild(trainingTip);
+
+        function changeTableColor() {
+            const color = document.getElementById('tableColor').value;
+            switch(color) {
+                case 'blue':
+                    tableColor = {main: '#0a5c8a', light: '#0b6699', dark: '#094d7a'};
+                    break;
+                case 'red':
+                    tableColor = {main: '#8a0a0a', light: '#990b0b', dark: '#7a0909'};
+                    break;
+                case 'purple':
+                    tableColor = {main: '#4a0a8a', light: '#530b99', dark: '#40097a'};
+                    break;
+                default:
+                    tableColor = {main: '#0a5c0a', light: '#0b660b', dark: '#095209'};
+            }
+        }
+
+        function changeGameMode() {
+            isTrainingMode = document.getElementById('gameMode').value === 'training';
+            if (!isTrainingMode) {
+                trainingTip.style.display = 'none';
+            }
+        }
+
+        function showTrainingTip(text, x, y) {
+            if (!isTrainingMode) return;
+            trainingTip.textContent = text;
+            trainingTip.style.display = 'block';
+            trainingTip.style.left = x + 'px';
+            trainingTip.style.top = y + 'px';
+        }
+
+        // Ball class with enhanced graphics
+        class Ball {
+            constructor(x, y, radius, color, number) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.number = number;
+                this.dx = 0;
+                this.dy = 0;
+                this.spin = 0;
+                this.rotation = 0;
+                this.colliding = false;
+                this.collisionTime = 0;
+            }
+
+            draw() {
+                // Ball shadow with dynamic offset based on movement
+                const shadowOffsetX = this.dx * 0.5;
+                const shadowOffsetY = this.dy * 0.5;
+                ctx.beginPath();
+                ctx.arc(this.x + shadowOffsetX + 2, this.y + shadowOffsetY + 2, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fill();
+                ctx.closePath();
+
+                // Ball glow effect when colliding
+                if (this.colliding) {
+                    const glowSize = Math.min((Date.now() - this.collisionTime) / 100, 1);
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius + 5 * (1 - glowSize), 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255,255,255,${0.3 * (1 - glowSize)})`;
+                    ctx.fill();
+                    ctx.closePath();
+                    
+                    if (Date.now() - this.collisionTime > 100) {
+                        this.colliding = false;
+                    }
+                }
+
+                // Main ball with rotation
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                // Ball base
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+
+                // Ball stripes or patterns
+                if (this.number > 0) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI * 2);
+                    ctx.fillStyle = 'white';
+                    ctx.fill();
+                    ctx.closePath();
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.closePath();
+                }
+
+                // Ball highlight with dynamic position based on movement
+                const speed = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
+                const highlightOffset = Math.min(speed * 0.2, this.radius * 0.3);
+                ctx.beginPath();
+                ctx.arc(-this.radius/3 + highlightOffset, -this.radius/3 + highlightOffset, this.radius/4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fill();
+                ctx.closePath();
+
+                // Number
+                if (this.number !== undefined) {
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.number, 0, 0);
+                }
+
+                ctx.restore();
+
+                // Update rotation based on spin and movement
+                this.rotation += this.spin + (Math.sqrt(this.dx * this.dx + this.dy * this.dy) * 0.05);
+            }
+
+            update() {
+                this.dx *= friction;
+                this.dy *= friction;
+                this.spin *= friction;
+
+                this.x += this.dx;
+                this.y += this.dy;
+
+                if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
+                    this.dx = -this.dx * 0.8;
+                    this.spin = -this.spin * 0.5;
+                    this.createCollisionEffect(this.x, this.y);
+                    sounds.railHit.play();
+                }
+                if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) {
+                    this.dy = -this.dy * 0.8;
+                    this.spin = -this.spin * 0.5;
+                    this.createCollisionEffect(this.x, this.y);
+                    sounds.railHit.play();
+                }
+
+                this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+            }
+
+            createCollisionEffect(x, y) {
+                this.colliding = true;
+                this.collisionTime = Date.now();
+                
+                // Create particle effect
+                for (let i = 0; i < 8; i++) {
+                    particles.push(new Particle(x, y));
+                }
+                sounds.ballCollision.play();
+            }
+        }
+
+        // Particle class for collision effects
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 2 + 1;
+                this.dx = Math.cos(angle) * speed;
+                this.dy = Math.sin(angle) * speed;
+                this.life = 1;
+                this.decay = Math.random() * 0.02 + 0.02;
+            }
+
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.life -= this.decay;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${this.life})`;
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        // Cue stick class
+        class CueStick {
+            constructor() {
+                this.length = 150;
+                this.width = 4;
+                this.color = '#8B4513';
+                this.tipColor = '#87CEEB';
+                this.visible = false;
+                this.power = 0;
+            }
+
+            draw(mouseX, mouseY) {
+                if (!this.visible) return;
+
+                const angle = Math.atan2(mouseY - cueBall.y, mouseX - cueBall.x);
+                const distance = 20 + this.power * 2;
+
+                ctx.save();
+                ctx.translate(cueBall.x, cueBall.y);
+                ctx.rotate(angle);
+
+                // Cue stick shadow
+                ctx.beginPath();
+                ctx.moveTo(distance + 2, 2);
+                ctx.lineTo(distance + this.length + 2, 2);
+                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.lineWidth = this.width + 2;
+                ctx.stroke();
+
+                // Main cue stick
+                const gradient = ctx.createLinearGradient(distance, 0, distance + this.length, 0);
+                gradient.addColorStop(0, this.tipColor);
+                gradient.addColorStop(0.1, this.color);
+                gradient.addColorStop(1, '#654321');
+
+                ctx.beginPath();
+                ctx.moveTo(distance, 0);
+                ctx.lineTo(distance + this.length, 0);
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = this.width;
+                ctx.stroke();
+
+                // Decorative rings
+                for (let i = 0; i < 3; i++) {
+                    const ringPos = distance + this.length * (0.3 + i * 0.2);
+                    ctx.beginPath();
+                    ctx.moveTo(ringPos, -this.width/2);
+                    ctx.lineTo(ringPos, this.width/2);
+                    ctx.strokeStyle = '#FFD700';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        let particles = [];
+        const cueStick = new CueStick();
+        // Initialize game with enhanced graphics
+        function initGame() {
+            cueBall = new Ball(200, canvas.height/2, 10, 'white');
+            balls = [cueBall];
+
+            const colors = [
+                {color: '#ff0000', number: 1},
+                {color: '#ffff00', number: 2},
+                {color: '#ff0000', number: 3},
+                {color: '#000080', number: 4},
+                {color: '#ffa500', number: 5},
+                {color: '#008000', number: 6},
+                {color: '#800080', number: 7}
+            ];
+
+            let startX = 600;
+            let startY = canvas.height/2;
+            let row = 0;
+            let col = 0;
+
+            colors.forEach(({color, number}, index) => {
+                const x = startX + col * 25;
+                const y = startY + (row - 2) * 22;
+                balls.push(new Ball(x, y, 10, color, number));
+                col++;
+                if (col > row) {
+                    row++;
+                    col = 0;
+                }
+            });
+        }
+
+        // Draw aim line with enhanced graphics
+        function drawAimLine(mouseX, mouseY) {
+            const angle = Math.atan2(mouseY - cueBall.y, mouseX - cueBall.x);
+            const lineLength = 100 + power * 5;
+            
+            // Draw shadow
+            ctx.beginPath();
+            ctx.moveTo(cueBall.x + 2, cueBall.y + 2);
+            ctx.lineTo(
+                cueBall.x + Math.cos(angle) * lineLength + 2,
+                cueBall.y + Math.sin(angle) * lineLength + 2
+            );
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+
+            // Draw main line
+            ctx.beginPath();
+            ctx.moveTo(cueBall.x, cueBall.y);
+            ctx.lineTo(
+                cueBall.x + Math.cos(angle) * lineLength,
+                cueBall.y + Math.sin(angle) * lineLength
+            );
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Draw pockets with enhanced graphics
+        function drawPockets() {
+            const pockets = [
+                {x: 0, y: 0},
+                {x: canvas.width/2, y: 0},
+                {x: canvas.width, y: 0},
+                {x: 0, y: canvas.height},
+                {x: canvas.width/2, y: canvas.height},
+                {x: canvas.width, y: canvas.height}
+            ];
+
+            pockets.forEach(pocket => {
+                // Pocket shadow
+                ctx.beginPath();
+                ctx.arc(pocket.x + 2, pocket.y + 2, pocketRadius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fill();
+                ctx.closePath();
+
+                // Main pocket
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, pocketRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#111';
+                ctx.fill();
+                ctx.closePath();
+
+                // Pocket inner shadow
+                const gradient = ctx.createRadialGradient(
+                    pocket.x, pocket.y, 0,
+                    pocket.x, pocket.y, pocketRadius
+                );
+                gradient.addColorStop(0, 'rgba(0,0,0,0)');
+                gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+                
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, pocketRadius, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        // Draw table decorations
+        function drawTable() {
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, tableColor.main);
+            gradient.addColorStop(0.5, tableColor.light);
+            gradient.addColorStop(1, tableColor.dark);
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Table markings
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            
+            // Center line
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/4, 0);
+            ctx.lineTo(canvas.width/4, canvas.height);
+            ctx.stroke();
+
+            // Diamond markers
+            const markers = [
+                {x: 50, y: 0}, {x: canvas.width-50, y: 0},
+                {x: 50, y: canvas.height}, {x: canvas.width-50, y: canvas.height},
+                {x: 0, y: 50}, {x: 0, y: canvas.height-50},
+                {x: canvas.width, y: 50}, {x: canvas.width, y: canvas.height-50}
+            ];
+
+            markers.forEach(marker => {
+                ctx.beginPath();
+                ctx.arc(marker.x, marker.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fill();
+                ctx.closePath();
+            });
+
+            // Table edge lighting
+            const edgeGlow = ctx.createLinearGradient(0, 0, 0, 10);
+            edgeGlow.addColorStop(0, 'rgba(255,255,255,0.2)');
+            edgeGlow.addColorStop(1, 'rgba(255,255,255,0)');
+            
+            ctx.fillStyle = edgeGlow;
+            ctx.fillRect(0, 0, canvas.width, 10);
+        }
+
+        // Trajectory prediction
+        function predictTrajectory(startX, startY, angle, power) {
+            const points = [];
+            let x = startX;
+            let y = startY;
+            let dx = Math.cos(angle) * power;
+            let dy = Math.sin(angle) * power;
+            
+            for (let i = 0; i < 50; i++) {
+                x += dx;
+                y += dy;
+                dx *= friction;
+                dy *= friction;
+                
+                // Check wall collisions
+                if (x < 0 || x > canvas.width) dx = -dx * 0.8;
+                if (y < 0 || y > canvas.height) dy = -dy * 0.8;
+                
+                points.push({x, y});
+                
+                // Stop if movement is too small
+                if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) break;
+            }
+            
+            return points;
+        }
+
+        function drawTrajectory(points) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            
+            points.forEach(point => {
+                ctx.lineTo(point.x, point.y);
+            });
+            
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Game loop with enhanced graphics
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawTable();
+            drawPockets();
+            
+            // Draw trajectory prediction in training mode
+            if (isTrainingMode && isAiming) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = lastMouseX - rect.left;
+                const mouseY = lastMouseY - rect.top;
+                const angle = Math.atan2(mouseY - cueBall.y, mouseX - cueBall.x);
+                const trajectory = predictTrajectory(cueBall.x, cueBall.y, angle, power);
+                drawTrajectory(trajectory);
+            }
+
+            // Update and draw particles
+            particles = particles.filter(particle => {
+                particle.update();
+                particle.draw();
+                return particle.life > 0;
+            });
+
+            // Update and draw balls
+            balls.forEach(ball => {
+                ball.update();
+                ball.draw();
+            });
+
+            // Draw cue stick
+            if (isAiming && Math.abs(cueBall.dx) < 0.1 && Math.abs(cueBall.dy) < 0.1) {
+                cueStick.visible = true;
+                cueStick.power = power;
+                cueStick.draw(lastMouseX - canvas.getBoundingClientRect().left, 
+                            lastMouseY - canvas.getBoundingClientRect().top);
+            } else {
+                cueStick.visible = false;
+            }
+
+            checkCollisions();
+            checkPockets();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        let lastMouseX, lastMouseY;
+
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            
+            if (Math.abs(cueBall.dx) < 0.1 && Math.abs(cueBall.dy) < 0.1) {
+                isAiming = true;
+                isPowerCharging = true;
+                powerCharge();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+
+            if (isTrainingMode) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Show training tips
+                if (isAiming) {
+                    showTrainingTip('اسحب للخلف لزيادة القوة', mouseX + 20, mouseY);
+                } else if (Math.abs(cueBall.dx) < 0.1 && Math.abs(cueBall.dy) < 0.1) {
+                    showTrainingTip('انقر وحرك الماوس لتحديد اتجاه التسديد', mouseX + 20, mouseY);
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (isAiming) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const angle = Math.atan2(mouseY - cueBall.y, mouseX - cueBall.x);
+                cueBall.dx = Math.cos(angle) * power;
+                cueBall.dy = Math.sin(angle) * power;
+                
+                isAiming = false;
+                isPowerCharging = false;
+                power = 0;
+                powerBar.style.width = '0%';
+                sounds.cueHit.play();
+            }
+        });
+
+        function powerCharge() {
+            if (isPowerCharging) {
+                power = (power + 0.2) % 20;
+                powerBar.style.width = (power / 20 * 100) + '%';
+                requestAnimationFrame(powerCharge);
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            scoreElement.textContent = score;
+            initGame();
+        }
+
+        // Check if ball is in pocket
+        function checkPockets() {
+            const pockets = [
+                {x: 0, y: 0},
+                {x: canvas.width/2, y: 0},
+                {x: canvas.width, y: 0},
+                {x: 0, y: canvas.height},
+                {x: canvas.width/2, y: canvas.height},
+                {x: canvas.width, y: canvas.height}
+            ];
+
+            balls = balls.filter(ball => {
+                const inPocket = pockets.some(pocket => {
+                    const dx = ball.x - pocket.x;
+                    const dy = ball.y - pocket.y;
+                    return Math.sqrt(dx*dx + dy*dy) < pocketRadius;
+                });
+
+                if (inPocket && ball !== cueBall) {
+                    score += 100;
+                    scoreElement.textContent = score;
+                    sounds.pocketBall.play();
+                    return false;
+                }
+                return true;
+            });
+
+            // Reset cue ball if it goes in pocket
+            if (!balls.includes(cueBall)) {
+                cueBall.x = 200;
+                cueBall.y = canvas.height/2;
+                cueBall.dx = 0;
+                cueBall.dy = 0;
+                balls.unshift(cueBall);
+            }
+        }
+
+        // Check ball collisions
+        function checkCollisions() {
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    const ball1 = balls[i];
+                    const ball2 = balls[j];
+                    
+                    const dx = ball2.x - ball1.x;
+                    const dy = ball2.y - ball1.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+
+                    if (distance < ball1.radius + ball2.radius) {
+                        // Collision response
+                        const angle = Math.atan2(dy, dx);
+                        const speed1 = Math.sqrt(ball1.dx*ball1.dx + ball1.dy*ball1.dy);
+                        const speed2 = Math.sqrt(ball2.dx*ball2.dx + ball2.dy*ball2.dy);
+
+                        const direction1 = Math.atan2(ball1.dy, ball1.dx);
+                        const direction2 = Math.atan2(ball2.dy, ball2.dx);
+
+                        // Transfer spin between balls
+                        const spinTransfer = (ball1.spin + ball2.spin) * 0.5;
+                        ball1.spin = spinTransfer;
+                        ball2.spin = -spinTransfer;
+
+                        ball1.dx = speed2 * Math.cos(direction2 - angle) * Math.cos(angle);
+                        ball1.dy = speed2 * Math.cos(direction2 - angle) * Math.sin(angle);
+                        ball2.dx = speed1 * Math.cos(direction1 - angle) * Math.cos(angle);
+                        ball2.dy = speed1 * Math.cos(direction1 - angle) * Math.sin(angle);
+
+                        // Move balls apart
+                        const overlap = (ball1.radius + ball2.radius - distance) / 2;
+                        ball1.x -= overlap * Math.cos(angle);
+                        ball1.y -= overlap * Math.sin(angle);
+                        ball2.x += overlap * Math.cos(angle);
+                        ball2.y += overlap * Math.sin(angle);
+
+                        // Create collision effect
+                        const collisionX = (ball1.x + ball2.x) / 2;
+                        const collisionY = (ball1.y + ball2.y) / 2;
+                        ball1.createCollisionEffect(collisionX, collisionY);
+                        ball2.createCollisionEffect(collisionX, collisionY);
+                    }
+                }
+            }
+        }
+
+        // Start game
+        initGame();
+        gameLoop();
+    </script>
+</body>
+</html>

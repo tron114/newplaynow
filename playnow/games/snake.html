@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة الثعبان</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        canvas {
+            border: 2px solid #333;
+            background: white;
+            margin: 20px;
+        }
+        .score {
+            font-size: 24px;
+            margin: 10px;
+        }
+        .controls {
+            margin: 20px;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        @media (max-width: 600px) {
+            canvas {
+                width: 300px;
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>لعبة الثعبان</h1>
+    <div class="score">النقاط: <span id="score">0</span></div>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div class="controls">
+        <button onclick="startGame()">بدء اللعب</button>
+    </div>
+    <div class="controls">
+        استخدم الأسهم ← ↑ → ↓ للتحكم
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        
+        let snake = [];
+        let food = {};
+        let direction = 'right';
+        let score = 0;
+        let gameLoop;
+        const gridSize = 20;
+        const speed = 100;
+
+        function startGame() {
+            // Reset game state
+            snake = [{x: 200, y: 200}];
+            score = 0;
+            scoreElement.textContent = score;
+            direction = 'right';
+            clearInterval(gameLoop);
+            createFood();
+            gameLoop = setInterval(updateGame, speed);
+        }
+
+        function createFood() {
+            food = {
+                x: Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize,
+                y: Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize
+            };
+        }
+
+        function updateGame() {
+            // Create new head
+            const head = {...snake[0]};
+            switch(direction) {
+                case 'up': head.y -= gridSize; break;
+                case 'down': head.y += gridSize; break;
+                case 'left': head.x -= gridSize; break;
+                case 'right': head.x += gridSize; break;
+            }
+
+            // Check collision with walls
+            if (head.x < 0 || head.x >= canvas.width || 
+                head.y < 0 || head.y >= canvas.height) {
+                clearInterval(gameLoop);
+                alert('انتهت اللعبة! النقاط: ' + score);
+                return;
+            }
+
+            // Check collision with self
+            for (let i = 0; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    clearInterval(gameLoop);
+                    alert('انتهت اللعبة! النقاط: ' + score);
+                    return;
+                }
+            }
+
+            // Add new head
+            snake.unshift(head);
+
+            // Check if food is eaten
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                scoreElement.textContent = score;
+                createFood();
+            } else {
+                snake.pop();
+            }
+
+            // Draw everything
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw snake
+            ctx.fillStyle = '#4CAF50';
+            snake.forEach(segment => {
+                ctx.fillRect(segment.x, segment.y, gridSize-2, gridSize-2);
+            });
+
+            // Draw food
+            ctx.fillStyle = 'red';
+            ctx.fillRect(food.x, food.y, gridSize-2, gridSize-2);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp':
+                    if (direction !== 'down') direction = 'up';
+                    break;
+                case 'ArrowDown':
+                    if (direction !== 'up') direction = 'down';
+                    break;
+                case 'ArrowLeft':
+                    if (direction !== 'right') direction = 'left';
+                    break;
+                case 'ArrowRight':
+                    if (direction !== 'left') direction = 'right';
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

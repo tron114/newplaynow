@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة تركيب القطع</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px;
+        }
+        .puzzle-board {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            grid-template-rows: repeat(4, 80px);
+            gap: 2px;
+            background: #333;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .puzzle-piece {
+            width: 80px;
+            height: 80px;
+            background: #4CAF50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s, background-color 0.2s;
+            border-radius: 3px;
+        }
+        .puzzle-piece:hover {
+            background: #45a049;
+            transform: scale(0.98);
+        }
+        .empty {
+            background: #666;
+        }
+        .controls {
+            margin: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        .stats {
+            margin: 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+        .level-select {
+            margin: 20px;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        .win-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(76, 175, 80, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            display: none;
+        }
+        @media (max-width: 400px) {
+            .puzzle-board {
+                grid-template-columns: repeat(4, 60px);
+                grid-template-rows: repeat(4, 60px);
+            }
+            .puzzle-piece {
+                width: 60px;
+                height: 60px;
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>لعبة تركيب القطع</h1>
+    
+    <div class="level-select">
+        <select id="levelSelect" onchange="changeLevel()">
+            <option value="numbers">أرقام</option>
+            <option value="emojis">رموز تعبيرية</option>
+            <option value="colors">ألوان</option>
+        </select>
+    </div>
+
+    <div class="stats">
+        <div>الخطوات: <span id="moves">0</span></div>
+        <div>أفضل نتيجة: <span id="bestScore">-</span></div>
+    </div>
+
+    <div class="game-container">
+        <div class="puzzle-board" id="puzzleBoard"></div>
+    </div>
+
+    <div class="controls">
+        <button onclick="shufflePuzzle()">خلط جديد</button>
+        <button onclick="resetGame()">إعادة اللعب</button>
+    </div>
+
+    <div class="win-message" id="winMessage">
+        <h2>مبروك! 🎉</h2>
+        <p>لقد أكملت اللغز في <span id="finalMoves">0</span> خطوة!</p>
+        <button onclick="resetGame()">العب مرة أخرى</button>
+    </div>
+
+    <script>
+        const board = document.getElementById('puzzleBoard');
+        const movesDisplay = document.getElementById('moves');
+        const bestScoreDisplay = document.getElementById('bestScore');
+        const winMessage = document.getElementById('winMessage');
+        
+        let pieces = [];
+        let emptyPos = 15;
+        let moves = 0;
+        let bestScore = localStorage.getItem('puzzleBestScore') || '-';
+        bestScoreDisplay.textContent = bestScore;
+
+        const levelTypes = {
+            numbers: Array.from({length: 15}, (_, i) => (i + 1).toString()),
+            emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵'],
+            colors: ['#FF5252', '#FF4081', '#E040FB', '#7C4DFF', '#536DFE', '#448AFF', '#40C4FF', '#18FFFF', 
+                    '#64FFDA', '#69F0AE', '#B2FF59', '#EEFF41', '#FFFF00', '#FFD740', '#FFAB40']
+        };
+
+        let currentLevel = 'numbers';
+
+        function createPiece(value, index) {
+            const piece = document.createElement('div');
+            piece.className = 'puzzle-piece';
+            if (currentLevel === 'colors') {
+                piece.style.background = value;
+            } else {
+                piece.textContent = value;
+            }
+            piece.addEventListener('click', () => movePiece(index));
+            return piece;
+        }
+
+        function initializeBoard() {
+            board.innerHTML = '';
+            pieces = [...levelTypes[currentLevel], ''];
+            pieces.forEach((value, index) => {
+                const piece = value ? createPiece(value, index) : document.createElement('div');
+                piece.className = value ? 'puzzle-piece' : 'puzzle-piece empty';
+                board.appendChild(piece);
+            });
+            emptyPos = 15;
+            moves = 0;
+            movesDisplay.textContent = moves;
+            winMessage.style.display = 'none';
+        }
+
+        function changeLevel() {
+            currentLevel = document.getElementById('levelSelect').value;
+            resetGame();
+        }
+
+        function isAdjacent(pos1, pos2) {
+            const row1 = Math.floor(pos1 / 4);
+            const col1 = pos1 % 4;
+            const row2 = Math.floor(pos2 / 4);
+            const col2 = pos2 % 4;
+            return Math.abs(row1 - row2) + Math.abs(col1 - col2) === 1;
+        }
+
+        function movePiece(index) {
+            if (isAdjacent(index, emptyPos)) {
+                const pieces = Array.from(board.children);
+                const temp = pieces[index].innerHTML;
+                const tempClass = pieces[index].className;
+                const tempStyle = pieces[index].style.background;
+
+                pieces[index].innerHTML = '';
+                pieces[index].className = 'puzzle-piece empty';
+                pieces[index].style.background = '';
+
+                pieces[emptyPos].innerHTML = temp;
+                pieces[emptyPos].className = tempClass;
+                pieces[emptyPos].style.background = tempStyle;
+
+                emptyPos = index;
+                moves++;
+                movesDisplay.textContent = moves;
+
+                if (checkWin()) {
+                    showWinMessage();
+                }
+            }
+        }
+
+        function checkWin() {
+            const currentOrder = Array.from(board.children).map(piece => 
+                currentLevel === 'colors' ? piece.style.background : piece.textContent
+            );
+            const correctOrder = [...levelTypes[currentLevel], ''];
+            return currentOrder.every((value, index) => value === correctOrder[index]);
+        }
+
+        function showWinMessage() {
+            document.getElementById('finalMoves').textContent = moves;
+            if (bestScore === '-' || moves < parseInt(bestScore)) {
+                bestScore = moves;
+                localStorage.setItem('puzzleBestScore', bestScore);
+                bestScoreDisplay.textContent = bestScore;
+            }
+            winMessage.style.display = 'block';
+        }
+
+        function shufflePuzzle() {
+            for (let i = 0; i < 1000; i++) {
+                const adjacentPositions = [];
+                const row = Math.floor(emptyPos / 4);
+                const col = emptyPos % 4;
+
+                if (row > 0) adjacentPositions.push(emptyPos - 4);
+                if (row < 3) adjacentPositions.push(emptyPos + 4);
+                if (col > 0) adjacentPositions.push(emptyPos - 1);
+                if (col < 3) adjacentPositions.push(emptyPos + 1);
+
+                const randomPos = adjacentPositions[Math.floor(Math.random() * adjacentPositions.length)];
+                movePiece(randomPos);
+            }
+            moves = 0;
+            movesDisplay.textContent = moves;
+        }
+
+        function resetGame() {
+            initializeBoard();
+            shufflePuzzle();
+        }
+
+        // Initialize game
+        resetGame();
+    </script>
+</body>
+</html>

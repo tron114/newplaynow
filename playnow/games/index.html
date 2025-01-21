@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ألعاب تلجرام</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #4CAF50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+        .game-card {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+            background: #3a3a3a;
+        }
+        .game-emoji {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .game-title {
+            font-size: 18px;
+            margin: 0;
+            color: #4CAF50;
+        }
+        .game-description {
+            font-size: 14px;
+            color: #aaa;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 ألعاب تلجرام</h1>
+    <div class="games-grid">
+        <a href="tictactoe.html" class="game-card">
+            <div class="game-emoji">❌</div>
+            <h2 class="game-title">لعبة XO</h2>
+            <p class="game-description">العب مع صديقك لعبة XO الكلاسيكية</p>
+        </a>
+        <a href="snake.html" class="game-card">
+            <div class="game-emoji">🐍</div>
+            <h2 class="game-title">لعبة الثعبان</h2>
+            <p class="game-description">قم بتوجيه الثعبان لأكل الطعام وتجنب الاصطدام</p>
+        </a>
+        <a href="memory.html" class="game-card">
+            <div class="game-emoji">🎴</div>
+            <h2 class="game-title">لعبة الذاكرة</h2>
+            <p class="game-description">اختبر ذاكرتك بمطابقة البطاقات المتشابهة</p>
+        </a>
+        <a href="builder.html" class="game-card">
+            <div class="game-emoji">🏗️</div>
+            <h2 class="game-title">لعبة البناء</h2>
+            <p class="game-description">ابنِ أطول برج ممكن بوضع الكتل بدقة</p>
+        </a>
+        <a href="puzzle.html" class="game-card">
+            <div class="game-emoji">🧩</div>
+            <h2 class="game-title">تركيب القطع</h2>
+            <p class="game-description">قم بتركيب الصورة من القطع المبعثرة</p>
+        </a>
+        <a href="pool.html" class="game-card">
+            <div class="game-emoji">🎱</div>
+            <h2 class="game-title">البلياردو</h2>
+            <p class="game-description">العب البلياردو مع أصدقائك بفيزياء واقعية</p>
+        </a>
+        <a href="blockpuzzle.html" class="game-card">
+            <div class="game-emoji">🟦</div>
+            <h2 class="game-title">لعبة المكعبات</h2>
+            <p class="game-description">قم بترتيب المكعبات وتجميع النقاط</p>
+        </a>
+    </div>
+</body>
+</html>

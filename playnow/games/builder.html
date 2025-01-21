@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة البناء المتطورة</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            direction: rtl;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+        .grid {
+            background: #fff;
+            border: 2px solid #333;
+            display: grid;
+            grid-template-columns: repeat(10, 50px);
+            grid-template-rows: repeat(10, 50px);
+            gap: 1px;
+            background-color: #ccc;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            background: #fff;
+            border: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: background-color 0.3s;
+        }
+        .cell:hover {
+            background-color: #f0f0f0;
+        }
+        .toolbar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .tools {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .tool {
+            padding: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .tool:hover {
+            background: #45a049;
+        }
+        .tool.selected {
+            background: #2196F3;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .controls button {
+            padding: 10px 20px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .controls button:hover {
+            background: #d32f2f;
+        }
+        .preview {
+            margin-top: 20px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>لعبة البناء المتطورة</h1>
+    <div class="game-container">
+        <div class="grid" id="grid"></div>
+        <div class="toolbar">
+            <h2>أدوات البناء</h2>
+            <div class="tools" id="tools">
+                <button class="tool" data-tool="🏠" onclick="selectTool(this)">
+                    🏠 منزل
+                </button>
+                <button class="tool" data-tool="🌳" onclick="selectTool(this)">
+                    🌳 شجرة
+                </button>
+                <button class="tool" data-tool="🛣️" onclick="selectTool(this)">
+                    🛣️ طريق
+                </button>
+                <button class="tool" data-tool="🌺" onclick="selectTool(this)">
+                    🌺 حديقة
+                </button>
+                <button class="tool" data-tool="🏢" onclick="selectTool(this)">
+                    🏢 مبنى
+                </button>
+                <button class="tool" data-tool="⛲" onclick="selectTool(this)">
+                    ⛲ نافورة
+                </button>
+                <button class="tool" data-tool="🚗" onclick="selectTool(this)">
+                    🚗 موقف
+                </button>
+                <button class="tool" data-tool="🏪" onclick="selectTool(this)">
+                    🏪 متجر
+                </button>
+            </div>
+            <div class="controls">
+                <button onclick="clearGrid()">مسح الكل</button>
+                <button onclick="saveDesign()">حفظ التصميم</button>
+            </div>
+            <div class="preview">
+                <h3>إحصائيات المدينة</h3>
+                <div id="stats"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedTool = null;
+        let grid = [];
+        const gridSize = 10;
+        
+        // Initialize grid
+        function initGrid() {
+            const gridElement = document.getElementById('grid');
+            for (let i = 0; i < gridSize; i++) {
+                grid[i] = [];
+                for (let j = 0; j < gridSize; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', () => placeTool(i, j));
+                    gridElement.appendChild(cell);
+                    grid[i][j] = '';
+                }
+            }
+        }
+
+        // Select tool
+        function selectTool(toolElement) {
+            // Remove selected class from all tools
+            document.querySelectorAll('.tool').forEach(tool => {
+                tool.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked tool
+            toolElement.classList.add('selected');
+            selectedTool = toolElement.dataset.tool;
+        }
+
+        // Place tool on grid
+        function placeTool(row, col) {
+            if (!selectedTool) return;
+            
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            if (cell) {
+                cell.innerHTML = selectedTool;
+                grid[row][col] = selectedTool;
+                updateStats();
+            }
+        }
+
+        // Clear grid
+        function clearGrid() {
+            grid = grid.map(row => row.map(() => ''));
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.innerHTML = '';
+            });
+            updateStats();
+        }
+
+        // Save design
+        function saveDesign() {
+            const design = {
+                grid: grid,
+                stats: calculateStats()
+            };
+            localStorage.setItem('cityDesign', JSON.stringify(design));
+            alert('تم حفظ التصميم!');
+        }
+
+        // Calculate stats
+        function calculateStats() {
+            const stats = {
+                '🏠': 0, // منازل
+                '🌳': 0, // أشجار
+                '🛣️': 0, // طرق
+                '🌺': 0, // حدائق
+                '🏢': 0, // مباني
+                '⛲': 0, // نوافير
+                '🚗': 0, // مواقف
+                '🏪': 0  // متاجر
+            };
+
+            grid.forEach(row => {
+                row.forEach(cell => {
+                    if (cell in stats) {
+                        stats[cell]++;
+                    }
+                });
+            });
+
+            return stats;
+        }
+
+        // Update stats display
+        function updateStats() {
+            const stats = calculateStats();
+            const statsElement = document.getElementById('stats');
+            statsElement.innerHTML = `
+                <p>منازل: ${stats['🏠']}</p>
+                <p>مباني: ${stats['🏢']}</p>
+                <p>متاجر: ${stats['🏪']}</p>
+                <p>أشجار: ${stats['🌳']}</p>
+                <p>حدائق: ${stats['🌺']}</p>
+                <p>نوافير: ${stats['⛲']}</p>
+                <p>طرق: ${stats['🛣️']}</p>
+                <p>مواقف: ${stats['🚗']}</p>
+            `;
+        }
+
+        // Load saved design
+        function loadSavedDesign() {
+            const savedDesign = localStorage.getItem('cityDesign');
+            if (savedDesign) {
+                const design = JSON.parse(savedDesign);
+                grid = design.grid;
+                grid.forEach((row, i) => {
+                    row.forEach((cell, j) => {
+                        const cellElement = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
+                        if (cellElement && cell) {
+                            cellElement.innerHTML = cell;
+                        }
+                    });
+                });
+                updateStats();
+            }
+        }
+
+        // Initialize game
+        initGrid();
+        loadSavedDesign();
+    </script>
+</body>
+</html>
